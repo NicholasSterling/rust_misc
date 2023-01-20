@@ -1,0 +1,12 @@
+[package]
+name = "hello_world"
+version = "0.1.0"
+authors = ["Nicholas Sterling <Nicholas.Sterling@gmail.com>"]
+edition = "2021"
+
+[profile.release]
+debug = true  # generate debug symbols, e.g. for flamegraph
+
+[dependencies]
+itertools = "0.10.1"
+num = "0.4.0"
