@@ -6,6 +6,8 @@ FastInputLocalMath (film)
  - Trig (sin, cos, tan, ..., and arc-sin, ...)
  - Divide
 Hashed
-SplitVec (two boxed arrays, indexed together, with .iter() and .iter_both())
+? SplitVec (two boxed arrays, indexed together, with .iter() and .iter_both())
+? OrderedSlice (two slices, one of indices into the other)
 CompressedSignal
 SumMults
+TopN: slice version (more efficent) and iterator version (stores values in power-of-2 ring)
