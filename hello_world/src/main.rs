@@ -34,9 +34,9 @@ fn main() {
             // expected: for<'r> fn(&'r {integer}) -> _
             // found:            fn(u32) -> _
     println!("{:?}", r().filter(|&x| is_even1(x)).collect::<Vec<u32>>());
-    println!("{:?}", r().filter(is_even2 ).collect::<Vec<u32>>());
-    println!("{:?}", r().filter(is_even3 ).collect::<Vec<u32>>());
-    println!("{:?}", r().filter(is_even4 ).collect::<Vec<u32>>());
+    println!("{:?}", r().filter(is_even2).collect::<Vec<u32>>());
+    println!("{:?}", r().filter(is_even3).collect::<Vec<u32>>());
+    println!("{:?}", r().filter(is_even4).collect::<Vec<u32>>());
 
     // Dynamic polymorphism.
     trait Canine         { fn id(&self) -> u32;      }
@@ -83,6 +83,7 @@ fn main() {
     // Oh, but wait -- the optimizer is not doing TCO, it's just optimizing
     // the whole thing to a constant, I think.
 
+
     // Returns an iterator that generates the Fibonacci sequence.
     fn fib() -> impl Iterator<Item = u32> {
         let mut nums = (0, 1);
@@ -99,6 +100,8 @@ fn main() {
         .filter(|x| x % 2 == 0)
         .sum::<u32>()
     );
+
+/////////////////////////////////////////////
 
     #[derive(Debug)]
     struct Foo {
@@ -117,6 +120,7 @@ fn main() {
     // println!("{:?}", map_by(foos,        |f| &f.name));   // ERROR: cannot infer lifetime
     // println!("{:?}", map_by(foos,        |f| f.name.as_str()));   // ERROR: cannot infer lifetime
 
+
     // Creating a HashMap from KV tuples.
     let tuples = vec![("one", 1), ("two", 2), ("three", 3)];
     let m: HashMap<_, _> = tuples.into_iter().collect();
@@ -134,6 +138,8 @@ fn main() {
 
     make_people();
 
+/////////////////////////////////////////////
+
     // Removing duplicates in unordered data.
     fn dedup(v: &mut Vec<i32>) {
         let mut set = HashSet::new();
@@ -142,6 +148,8 @@ fn main() {
     let mut nums = vec![3,7,1,3,2,1,5];
     dedup(&mut nums);
     dbg!(nums);
+
+/////////////////////////////////////////////
 
     // Transmuting data.
     let array = [10,11,12,13];
@@ -153,6 +161,8 @@ fn main() {
     dbg!(ptr[1][0]);
     dbg!(ptr);
 
+/////////////////////////////////////////////
+
     // Generic arithmetic.
     use std::ops::Div;
     use num::Integer;
@@ -161,6 +171,8 @@ fn main() {
     }
     dbg!(div_rounded(7,3));  // 2
     dbg!(div_rounded(8,3));  // 3
+
+/////////////////////////////////////////////
 
     // Balanced pairs.
     // Here's a clever solution: https://exercism.org/tracks/rust/exercises/matching-brackets/solutions/michaelmez39
@@ -195,52 +207,21 @@ fn main() {
     dbg!(is_balanced("{}}{}"));
 
     fn is_balanced(string: &str, pairs: &[(char, char)]) -> bool {
-    let mut need = Vec::new();
-    for c in string.chars() {
-        if let Some((_, close)) = pairs.iter().find( |(open, _)| c == *open ) {
-            need.push(*close);
-        } else if PAIRS.iter().any( |(_, close)| c == *close ) && need.pop() != Some(c) {
-            return false;
+        let mut need = Vec::new();
+        for c in string.chars() {
+            if let Some((_, close)) = pairs.iter().find( |(open, _)| c == *open ) {
+                need.push(*close);
+            } else if PAIRS.iter().any( |(_, close)| c == *close ) && need.pop() != Some(c) {
+                return false;
+            }
         }
+        need.is_empty()
     }
-    need.is_empty()
-}
     const PAIRS: [(char,char); 3] = [ ('(',')'), ('[',']'), ('{','}') ];
-    /*
-    let foo = str5.as_bytes();
-    fn _is_balanced(s: &str) -> bool {
-        const pairs: [(u8, u8); 3] = [
-            (b'{', b'}'),
-            (b'(', b')'),
-            (b'[', b']'),
-        ];
-        fn remove_prefixes(bytes: &[u8]) -> &[u8] {
-            while let Some((c, rest)) = bytes.split_first() {
-            }
-        }
-        fn remove_balanced(bytes: &[u8]) -> &[u8] {
-            // _{ { } { { } } } { }
-            while let Some((c, rest)) = bytes.split_first() {
-                //  {_{ } { { } } } { }
-                if let Some((_, expected_closer)) = pairs.iter().find( |(opener, _)| b == opener ) {
-                    let rest = remove_balanced(rest);
-                    //  { { } { { } }_} { }
-                    if let Some((closer, rest)) = rest.split_first() {
-                        if closer == expected_closer {
-                            let rest = remove_balanced(rest);
-                        } else {
-
-                        }
-                    }
-                } else { // does not start with an opener
-                    bytes
-                }
-            }
-        }
-    }
-     */
 
 }
+
+/////////////////////////////////////////////
 
 // https://play.rust-lang.org/?version=stable&mode=debug&edition=2018&gist=700f859b212e3fb5d3a9b3c1f7614abc
 // https://play.rust-lang.org/?version=nightly&mode=debug&edition=2018&gist=6dbf3004a59886a893f1a8347c0c0d1f
@@ -255,6 +236,8 @@ where I: IntoIterator<Item = V>,
 }
 
 /////////////////////////////////////////////
+
+// collect_tuple
 
 #[derive(Debug)]
 struct Person<'a> {
@@ -279,3 +262,12 @@ fn make_people() {
     dbg!(p1.first);
     dbg!(p1.last);
 }
+
+/////////////////////////////////////////////
+
+// Make array on the heap without first making it on the stack.
+// https://users.rust-lang.org/t/u8-1024-1024-or-a-vec-u8/106542/16
+pub fn make_boxed_array<T, const N: usize, F: Fn(usize) -> T>(f: F) -> Box<[T; N]> {
+    (0..N).map(f).collect::<Box<[_]>>().try_into().ok().unwrap()
+}
+
