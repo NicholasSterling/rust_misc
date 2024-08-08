@@ -8,23 +8,20 @@ pub fn sum_multiples(limit: u64, factors: &[u64]) -> u64 {
 
   dbg!(&factors);
 
-  // Returns the lowest common multiple of a and b.
-  fn lcm(a: u64, b: u64) -> u64 {
-    a*b / gcd(a,b)
-  }
-
-  // Returns the greatest common divisor of a and b.
-  fn gcd(a: u64, b: u64) -> u64 {
-    if b == 0 {a} else { gcd(b, a%b) }
-  }
-
   fn sum_from_ix(i: usize, limit: u64, factors: &[u64]) -> u64 {
+    
     if i == factors.len() {  // we've processed all factors
       0
     } else {
-      let factor = factors[i];
-      //dbg!(&factor);
-      let n = limit / factor;  // # of multiples of factor to sum
+
+      // Returns the greatest common divisor of a and b.
+      fn gcd(a: u64, b: u64) -> u64 {
+        if b == 0 {a} else { gcd(b, a%b) }
+      }
+
+      // Returns the lowest common multiple of a and b.
+      let lcm = |a,b| a*b / gcd(a,b);
+
       // Returns the sum of the integers from 1 to n.
       let sum_1_to = |n|
         // n * (n+1) might overflow, so do the /2 first, to the even number.
@@ -33,6 +30,10 @@ pub fn sum_multiples(limit: u64, factors: &[u64]) -> u64 {
         } else {
           n/2 * (n+1)  // n is even
         };
+
+      let factor = factors[i];
+      //dbg!(&factor);
+      let n = limit / factor;  // # of multiples of factor to sum
       let sum_of_multiples_of_factor = factor * sum_1_to(n);
       let new_factors: Vec<_> = factors[..i].iter()
         .map(|&prev_factor| lcm(prev_factor, factor))
@@ -43,10 +44,12 @@ pub fn sum_multiples(limit: u64, factors: &[u64]) -> u64 {
         sum_from_ix(0, limit, &new_factors[..]);  // <-- RECURSION
       let sum_of_multiples_of_rest_of_factors =
         sum_from_ix(i+1, limit, factors);                 // <-- RECURSION
+
       sum_of_multiples_of_factor
         - sum_of_previously_seen_multiples_of_factor
         + sum_of_multiples_of_rest_of_factors
     }
+
   }
 
   sum_from_ix(0, limit, factors)
