@@ -1,42 +1,42 @@
 #![warn(clippy::pedantic)]
 
+use num::{Unsigned, Integer};
+use std::cmp::PartialOrd;
+use std::fmt::Debug;
+
 // TODO:
 // This version is recursive, and not tail-recursive.  Is that OK?
-// It is u64-only, and needs to be genericized over unsigned integers.
 
-pub fn sum_multiples(limit: u64, factors: &[u64]) -> u64 {
+pub fn sum_multiples<T>(limit: T, factors: &[T]) -> T
+where T: Unsigned + Integer + PartialOrd + Copy + Debug
+{
+  // dbg!(&factors);
 
-  dbg!(&factors);
-
-  fn sum_from_ix(i: usize, limit: u64, factors: &[u64]) -> u64 {
+  fn sum_from_ix<T>(i: usize, limit: T, factors: &[T]) -> T
+  where T: Unsigned + Integer + PartialOrd + Copy + Debug
+  {
+    let _0 = T::zero();
+    let _1 = T::one();
+    let _2 = _1 + _1;
     
     if i == factors.len() {  // we've processed all factors
-      0
+      _0
     } else {
-
-      // Returns the greatest common divisor of a and b.
-      fn gcd(a: u64, b: u64) -> u64 {
-        if b == 0 {a} else { gcd(b, a%b) }
-      }
-
-      // Returns the lowest common multiple of a and b.
-      let lcm = |a,b| a*b / gcd(a,b);
-
-      // Returns the sum of the integers from 1 to n.
-      let sum_1_to = |n|
-        // n * (n+1) might overflow, so do the /2 first, to the even number.
-        if n&1 != 0 {
-          (n+1)/2 * n  // n is odd
-        } else {
-          n/2 * (n+1)  // n is even
-        };
 
       let factor = factors[i];
       //dbg!(&factor);
       let n = limit / factor;  // # of multiples of factor to sum
-      let sum_of_multiples_of_factor = factor * sum_1_to(n);
+      //let sum_of_multiples_of_factor = factor * sum_1_to(n);
+      let sum_of_multiples_of_factor = factor * (
+        // n * (n+1) might overflow, so do the /2 first, to the even number.
+        if n.is_odd() {
+          (n+_1)/_2 * n
+        } else {
+          n/_2 * (n+_1)
+        }
+      );
       let new_factors: Vec<_> = factors[..i].iter()
-        .map(|&prev_factor| lcm(prev_factor, factor))
+        .map(|&prev_factor| prev_factor.lcm(&factor))
         .filter(|&new_factor| new_factor <= limit)
         .collect();
       //dbg!(&new_factors);
@@ -56,12 +56,6 @@ pub fn sum_multiples(limit: u64, factors: &[u64]) -> u64 {
 
 }
 
-      /*
-      if factors[0..i].iter().any(|prev_factor| factor % prev_factor == 0) {
-        dbg!("skipped because factor is divisible by one of these");
-        dbg!(&factors[0..i]);
-        0
-     */
 
 #[cfg(test)]
 mod tests {
@@ -103,6 +97,14 @@ mod tests {
       let ours = sum_multiples(limit, &factors);
       let good = slow_reliable(limit, &factors);
       assert_eq!(ours, good);
+    }
+
+    #[test]
+    fn show_result() {
+      let limit = 20u8;
+      let factors = [3,5,15,30];
+      let ours = sum_multiples(limit, &factors);
+      dbg!(ours);
     }
 
     use proptest::prelude::*;
