@@ -12,22 +12,17 @@ where T: Unsigned + Integer + PartialOrd + Copy + Debug
 {
   // dbg!(&factors);
 
-  fn sum_from_ix<T>(i: usize, limit: T, factors: &[T]) -> T
-  where T: Unsigned + Integer + PartialOrd + Copy + Debug
-  {
-    let _0 = T::zero();
-    let _1 = T::one();
-    let _2 = _1 + _1;
-    
-    if i == factors.len() {  // we've processed all factors
-      _0
-    } else {
+  let _0 = T::zero();
+  let _1 = T::one();
+  let _2 = _1 + _1;
 
-      let factor = factors[i];
+  let mut sum = _0;
+    
+  for (i, factor) in factors.iter().enumerate() {
+
       //dbg!(&factor);
-      let n = limit / factor;  // # of multiples of factor to sum
-      //let sum_of_multiples_of_factor = factor * sum_1_to(n);
-      let sum_of_multiples_of_factor = factor * (
+      let n = limit / *factor;  // # of multiples of factor to sum
+      let sum_of_multiples_of_factor = *factor * (
         // n * (n+1) might overflow, so do the /2 first, to the even number.
         if n.is_odd() {
           (n+_1)/_2 * n
@@ -41,18 +36,14 @@ where T: Unsigned + Integer + PartialOrd + Copy + Debug
         .collect();
       //dbg!(&new_factors);
       let sum_of_previously_seen_multiples_of_factor =
-        sum_from_ix(0, limit, &new_factors[..]);  // <-- RECURSION
-      let sum_of_multiples_of_rest_of_factors =
-        sum_from_ix(i+1, limit, factors);                 // <-- RECURSION
+        sum_multiples(limit, &new_factors[..]);  // <-- RECURSION
 
-      sum_of_multiples_of_factor
-        - sum_of_previously_seen_multiples_of_factor
-        + sum_of_multiples_of_rest_of_factors
-    }
-
+      sum = sum
+        + sum_of_multiples_of_factor
+        - sum_of_previously_seen_multiples_of_factor;
   }
 
-  sum_from_ix(0, limit, factors)
+  sum
 
 }
 
