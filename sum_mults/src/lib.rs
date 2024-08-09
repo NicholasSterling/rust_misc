@@ -4,19 +4,17 @@ use num::{Unsigned, Integer};
 use std::cmp::PartialOrd;
 use std::fmt::Debug;
 
-// TODO:
-// This version is recursive, and not tail-recursive.  Is that OK?
-
 pub fn sum_multiples<T>(limit: T, factors: &[T]) -> T
 where T: Unsigned + Integer + PartialOrd + Copy + Debug
 {
   // dbg!(&factors);
 
-  let _0 = T::zero();
-  let _1 = T::one();
-  let _2 = _1 + _1;
+  // The constants 0, 1, and 2 in whatever unsigned integer type we are using.
+  let c0 = T::zero();
+  let c1 = T::one();
+  let c2 = c1 + c1;
 
-  let mut sum = _0;
+  let mut sum = c0;
     
   for (i, factor) in factors.iter().enumerate() {
 
@@ -25,14 +23,13 @@ where T: Unsigned + Integer + PartialOrd + Copy + Debug
       let sum_of_multiples_of_factor = *factor * (
         // n * (n+1) might overflow, so do the /2 first, to the even number.
         if n.is_odd() {
-          (n+_1)/_2 * n
+          (n+c1)/c2 * n
         } else {
-          n/_2 * (n+_1)
+          n/c2 * (n+c1)
         }
       );
       let new_factors: Vec<_> = factors[..i].iter()
-        .map(|&prev_factor| prev_factor.lcm(&factor))
-        .filter(|&new_factor| new_factor <= limit)
+        .map(|&prev_factor| prev_factor.lcm(factor))
         .collect();
       //dbg!(&new_factors);
       let sum_of_previously_seen_multiples_of_factor =
