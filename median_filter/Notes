@@ -1,0 +1,64 @@
+Incremental, unlike existing crate which does a full sort each time to get the median.
+Instead keep track of the median and insert new values above or below.
+A median filter with a "bite" of 3 filters over the 7 (2n+1) most recent entries:
+
+     #  #  #  M  #  #  #
+
+This type of median filter (holding an odd number of values) does not average
+the two middle values as an "even" median filter does.  An even median filter
+ - performs a bit worse
+ - doesn't quite fit with the "bite" analogy.
+On the other hand, I think it chews off a bit less of the extrema (need to check)
+and results in smoother output.
+
+You could do an even median filter, but for performance it should be a separate implementation.
+For now I think it suffices to do an "odd" median filter.
+
+The output of the median filter is delayed "bite" entries from the input.
+
+Generic over the type of numbers we are using.
+A median filter with a bite of 3 might look like this:
+
+    17  9  3 -4  0  7 12  values
+    -- -- -- -- -- -- --
+     0  1  2  3  4  5  6  indices
+     3  4  2  5  1  6  0  sorted indices
+              ^           median = 7
+
+Values are stored in an array used as a ring buffer;
+new values are added to one end, overwriting old values.
+Values are never moved.
+
+Use power-of-2 size so AND can advance the index, e.g.
+  new_ix = (new_ix + 1) & 15;  // for a ring buffer of size 16
+
+Pre-initialize buffer entries to a specified starting value so that
+it is always full, to eliminate handling of other cases.  If a suitable
+starting value is unknown, then wait bite entries before using output.
+
+For the example above, when a new value arrives we compare it to
+the median -- the value at index 5 -- to know whether to insert it
+into the upper half or lower half.
+
+How to store the sorted indices?  For max performance, store them in a
+word and use shifts to do insertions and deletions.
+
+For 16 values, use a 4-bit index in a 64-bit word.  Max bite = 7
+For  8 values, use a 3-bit index in a 32-bit word.  Max bite = 3
+For  4 values, use a 2-bit index in an 8-bit byte.  Max bite = 1
+A byte would only allow for a bite of 1, but that might be fine for
+some embedded systems where the difference between storing 32 bits
+and 8 bits could be significant.  But start with 32-bit words.
+Bites of more than 3 are probably unusual, because it would imply
+that you are sampling your data too frequently.  And 32-bit words
+will be common for embedded systems.
+
+To speed up deletions (as values are overwritten), we could maintain
+an inverse mapping of the sorted indices.  That is, the mapping we
+have been talking about so far is
+  0..N-1 (smallest to largest value) => its index in ring buffer
+The inverse mapping
+  index in ring buffer => 0..N-1 (smallest to largest value)
+That would allow us to take the index being overwritten and find
+its rank within the ordering, i.e. where to find it in the sorted indices.
+
