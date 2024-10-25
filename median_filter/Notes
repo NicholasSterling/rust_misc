@@ -1,17 +1,23 @@
 Incremental, unlike existing crate which does a full sort each time to get the median.
-Instead keep track of the median and insert new values above or below.
-A median filter with a "bite" of 3 filters over the 7 (2n+1) most recent entries:
+Instead keep indices in sorted order and insert new values into that ordering.
+
+A median filter with a "bite" of 3 filters over the 7 (2b+1) most recent entries:
 
      #  #  #  M  #  #  #
+     -------     -------   a spike fitting in a "wing" will be bitten off
+
+Pacman analogy for "bite."
 
 This type of median filter (holding an odd number of values) does not average
 the two middle values as an "even" median filter does.  An even median filter
  - performs a bit worse
  - doesn't quite fit with the "bite" analogy.
+ - can produce values not in the input (e.g. signal with only -1 and 1 might yield 0)
 On the other hand, I think it chews off a bit less of the extrema (need to check)
-and results in smoother output.
+and results in smoother output.  And it can make better use of memory in the
+implementation discussed below.
 
-You could do an even median filter, but for performance it should be a separate implementation.
+An even median filter should be a separate implementation for performance.
 For now I think it suffices to do an "odd" median filter.
 
 The output of the median filter is delayed "bite" entries from the input.
@@ -23,42 +29,63 @@ A median filter with a bite of 3 might look like this:
     -- -- -- -- -- -- --
      0  1  2  3  4  5  6  indices
      3  4  2  5  1  6  0  sorted indices
-              ^           median = 7
+              ^           median = values[5] = 7
 
 Values are stored in an array used as a ring buffer;
 new values are added to one end, overwriting old values.
 Values are never moved.
 
 Use power-of-2 size so AND can advance the index, e.g.
-  new_ix = (new_ix + 1) & 15;  // for a ring buffer of size 16
+  new_ix = (new_ix + 1) & 7;  // for a ring buffer of size 8
 
 Pre-initialize buffer entries to a specified starting value so that
 it is always full, to eliminate handling of other cases.  If a suitable
 starting value is unknown, then wait bite entries before using output.
 
-For the example above, when a new value arrives we compare it to
-the median -- the value at index 5 -- to know whether to insert it
-into the upper half or lower half.
+How to store the sorted indices?  Keep them sorted in an array so we can
+do a binary lookup to figure out where to insert a new value.
 
-How to store the sorted indices?  For max performance, store them in a
-word and use shifts to do insertions and deletions.
+For max performance, store them in a word and use shifts
+to do insertions and deletions.
 
-For 16 values, use a 4-bit index in a 64-bit word.  Max bite = 7
-For  8 values, use a 3-bit index in a 32-bit word.  Max bite = 3
-For  4 values, use a 2-bit index in an 8-bit byte.  Max bite = 1
-A byte would only allow for a bite of 1, but that might be fine for
-some embedded systems where the difference between storing 32 bits
-and 8 bits could be significant.  But start with 32-bit words.
+                                               odd  even
+16 4-bit indices in a 64-bit word.  Max bite =  7    8
+ 8 4-bit indices in a 32-bit word.  Max bite =  3    4     (start with this)
+ 8 3-bit indices in a 32-bit word.  Max bite =  3    4     (limit 8 for 3-bit ix)
+ 5 3-bit indices in a 16-bit word.  Max bite =  2    2
+ 4 2-bit indices in an 8-bit byte.  Max bite =  1    2
+
+An even median filter would use the space more effectively in some cases.
+
+A byte would only allow for a bite of 1/2, but that might be fine for
+some embedded systems where the difference between storing 32 vs 8 bits
+could be significant (small RAM/cache).  But start with 32-bit words.
 Bites of more than 3 are probably unusual, because it would imply
 that you are sampling your data too frequently.  And 32-bit words
 will be common for embedded systems.
 
-To speed up deletions (as values are overwritten), we could maintain
-an inverse mapping of the sorted indices.  That is, the mapping we
+To speed up deletions (as values are overwritten), maintain an
+inverse mapping of the sorted indices.  That is, the mapping we
 have been talking about so far is
-  0..N-1 (smallest to largest value) => its index in ring buffer
+  0..N-1 (rank smallest to largest value) => its index in ring buffer
 The inverse mapping
-  index in ring buffer => 0..N-1 (smallest to largest value)
+  index in ring buffer => 0..N-1 (rank smallest to largest value)
 That would allow us to take the index being overwritten and find
 its rank within the ordering, i.e. where to find it in the sorted indices.
 
+So an odd 32-bit median filter would contain:
+ - a 32-bit word containing the indices 0..6 in order by their values
+ - a 32-bit word for the inverse mapping
+ - an array of 7 values (whatever type that is, e.g. i16)
+
+And an even 8-bit median filter would contain:
+ - a byte containing the indices 0..3 in order by their values
+ - a byte for the inverse mapping
+ - an array of 4 values
+ That's only 10 bytes for an even bite-2 median filter of i16 values.
+
+We could create smaller arrays for smaller bites, of course.
+
+ Note that when dealing with MediaPipe Pose, you get 32 landmarks,
+ each with X, Y, and Z coordinates.  If you filter each of those,
+ that is 96 median filters!  So size can matter.
