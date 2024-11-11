@@ -1,0 +1,43 @@
+Both the median filter and top-N projects could make use of a crate
+that maintains a small sorted list.  By that I mean a pair of arrays, e.g.
+
+  values: [T;16],   16 entries of some type T, as a ring buffer in FIFO order
+  ordered_ixs: u64, 16 4-bit indices packed in a single word, in sort order
+  inverse_ixs: u64, We also need the reverse mapping; see below
+
+Implementations for u64, u32, u16, u8?
+
+Methods:
+  replace_oldest(t: T)  Removes oldest T, adds T after newest, updates order
+  replace_lowest(t: T)  Removes lowest T, puts new T there, updates order
+  replace_highest(t: T)
+  ix_of_oldest() => usize
+  ix_of_lowest() => usize
+  ix_of_highest() => usize
+  at_ix(i: u64) => T
+
+Shift operations allow us to insert/delete indices more efficiently.
+Let's say you just replaced values[3] with new_value.
+Now you need to
+ - figure out where its index 3 should go in the ordering
+ - update the ordering
+    - remove 3 from wherever it was
+    - insert it where it should be
+To remove efficiently, we need a third "array" that is the reverse mapping
+of the ordering.  That is, for each value index, it tells us where to find it
+in the ordering array.
+  values[value_ix] = new_value;
+  let order_ix = inverse_ixs[value_ix];
+  // remove that index (which contains value_ix) from ordered_ixs
+  // search for correct location for the new entry among the rest, new_order_ix
+  // insert value_ix into ordered_ixs at new_order_ix
+  // insert new_order_ix into inverse_ixs at value_ix
+
+Maybe use a NanoArray from the nanovec crate?
+https://docs.rs/nanovec/0.2.1/nanovec/array/trait.NanoArray.html
+
+
+Can SIMD help with keeping the array ordered?
+NO -- those small values are the indices, not the values!
+
+
