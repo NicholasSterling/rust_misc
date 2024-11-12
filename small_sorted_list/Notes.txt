@@ -8,13 +8,13 @@ that maintains a small sorted list.  By that I mean a pair of arrays, e.g.
 Implementations for u64, u32, u16, u8?
 
 Methods:
-  replace_oldest(t: T)  Removes oldest T, adds T after newest, updates order
-  replace_lowest(t: T)  Removes lowest T, puts new T there, updates order
-  replace_highest(t: T)
+  replace_oldest(t: T)      Replaces the oldest T (for median filter)  ???
   ix_of_oldest() => usize
+  
+  at_ix(i: usize) => T      No, use Rust's trait for indexes (Index?)
+  replace(i: usize, t: T)   Replaces the i-th T in sort order
   ix_of_lowest() => usize
   ix_of_highest() => usize
-  at_ix(i: u64) => T
 
 Shift operations allow us to insert/delete indices more efficiently.
 Let's say you just replaced values[3] with new_value.
@@ -32,6 +32,20 @@ in the ordering array.
   // search for correct location for the new entry among the rest, new_order_ix
   // insert value_ix into ordered_ixs at new_order_ix
   // insert new_order_ix into inverse_ixs at value_ix
+
+PROBLEM!  When we change the ordering, multiple entries in inverse_ixs are going to
+need to be incremented or decremented.
+
+replace() doesn't need inverse_ixs.  ???
+E.g. the lowest value is at ix 0 in ordered_ixs.  You just replace
+  values[ordered_ixs[0]]
+and update the ordering.
+
+But replace_oldest() needs to find which entry in ordered_ixs is ring_start_ix.
+
+Also, median filter has to only consider the right number of entries,
+which is likely not 16 (or whatever the unsigned integer holds).
+This data structure probably does not work for median filter.
 
 Maybe use a NanoArray from the nanovec crate?
 https://docs.rs/nanovec/0.2.1/nanovec/array/trait.NanoArray.html
