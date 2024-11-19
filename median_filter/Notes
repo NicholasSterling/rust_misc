@@ -86,6 +86,74 @@ And an even 8-bit median filter would contain:
 
 We could create smaller arrays for smaller bites, of course.
 
- Note that when dealing with MediaPipe Pose, you get 32 landmarks,
- each with X, Y, and Z coordinates.  If you filter each of those,
- that is 96 median filters!  So size can matter.
+Note that when dealing with MediaPipe Pose, you get 32 landmarks,
+each with X, Y, and Z coordinates.  If you filter each of those,
+that is 96 median filters!  So size can matter.
+
+Have a special implementation for a bite of 1, for space and performance.
+Use a generic constant for BITE, with an impl for 1.
+As you bring in a new value C, the previous two values, A and B,
+can only be in one of two orders, AB or BA.  So do
+  // Takes the latest value and returns the median of the last 3.
+  push(c: T) -> T {
+    let a = self.a;
+    let b = self.b;
+    self.a = b;
+    self.b = c;
+    if a <= b {           // AB
+      if c > b {
+        b
+      } else if c < a {
+        a
+      } else {
+        c
+      }
+    } else {              // BA
+      if c < b {
+        b
+      } else if c > a {
+        a
+      } else {
+        c
+      }
+    }
+  }
+
+Also test a (somewhat) branchless implementation:
+  push(c: T) -> T {
+    let a = self.a;
+    let b = self.b;
+    self.a = b;
+    self.b = c;
+    let up = a <= b;
+    let diff = b - a;
+    let lo = b - up * diff;
+    let hi = a + up * diff;
+    if c > hi {
+      hi
+    } else if c < lo {
+      lo
+    } else {
+      c
+    }
+  }
+
+Even more branchless:
+  push(c: T) -> T {
+    let a = self.a;
+    let b = self.b;
+    self.a = b;
+    self.b = c;
+    let up = a <= b;
+    let diff = b - a;
+    let lo = b - up * diff;
+    let hi = a + up * diff;
+    let up = hi < c;
+    let dn = lo > c;
+    c - up * (c - hi) + dn * (lo - c)
+  }
+
+Note that result == b tells us whether the original value was retained.
+We could use that to improve replaced values using another type of filter
+that considers the slope on each side:
+    ( (b + (b-a) + d + (d-e)) + (b + d) ) / 4
