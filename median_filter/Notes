@@ -157,3 +157,33 @@ Note that result == b tells us whether the original value was retained.
 We could use that to improve replaced values using another type of filter
 that considers the slope on each side:
     ( (b + (b-a) + d + (d-e)) + (b + d) ) / 4
+
+I asked ChatGPT to help:
+  Please make a faster version which uses branchless programming
+  to find the median rather than sorting the values.
+
+Here was its response.  I doubt that it uses BP, but try it:
+  struct TwoValues {
+      a: i32,
+      b: i32,
+  }
+
+  impl TwoValues {
+      fn new(a: i32, b: i32) -> Self {
+          Self { a, b }
+      }
+
+      fn push(&self, x: i32) -> i32 {
+          let max_ab = self.a.max(self.b);
+          let min_ab = self.a.min(self.b);
+          
+          // The median is the middle value: max of the smaller two and min of the larger two
+          x.max(min_ab).min(max_ab)
+      }
+  }
+
+  fn main() {
+      let values = TwoValues::new(10, 20);
+      let median = values.push(15);
+      println!("Median: {}", median); // Output: Median: 15
+  }
