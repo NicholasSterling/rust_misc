@@ -140,16 +140,22 @@ Also test a (somewhat) branchless implementation:
 
 Even more branchless:
   push(c: T) -> T {
+
     let a = self.a;
     let b = self.b;
     self.a = b;
     self.b = c;
-    let up = a <= b;
+
     let diff = b - a;
+    // let up = a < b;          // variant 1
+    let up = diff > 0;          // variant 2
     let lo = b - up * diff;
-    let hi = a + up * diff;
+    // let hi = a + up * diff;  // variant 1
+    let hi = lo + diff.abs();   // variant 2
+
     let up = hi < c;
     let dn = lo > c;
+
     c - up * (c - hi) + dn * (lo - c)
   }
 
@@ -162,28 +168,30 @@ I asked ChatGPT to help:
   Please make a faster version which uses branchless programming
   to find the median rather than sorting the values.
 
-Here was its response.  I doubt that it uses BP, but try it:
-  struct TwoValues {
+Here was its response (cleaned up a bit).  I doubt that it uses BP, but try it:
+
+  struct MedianFilter3 {
       a: i32,
       b: i32,
   }
 
-  impl TwoValues {
+  impl MedianFilter3 {
       fn new(a: i32, b: i32) -> Self {
           Self { a, b }
       }
 
-      fn push(&self, x: i32) -> i32 {
+      fn push(&mut self, x: i32) -> i32 {
           let max_ab = self.a.max(self.b);
           let min_ab = self.a.min(self.b);
-          
-          // The median is the middle value: max of the smaller two and min of the larger two
           x.max(min_ab).min(max_ab)
       }
   }
 
   fn main() {
-      let values = TwoValues::new(10, 20);
+      let values = MedianFilter3::new(10, 20);
       let median = values.push(15);
       println!("Median: {}", median); // Output: Median: 15
   }
+
+For initial values use the highest and lowest possible values.
+That will ensure that the supplied argument is returned as the median.
