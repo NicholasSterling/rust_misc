@@ -1,0 +1,172 @@
+This is kind of a take 2; lots of new thoughts.
+
+I am imagining something like yazi merged with skim and some other enhancements,
+all driving something like nushell.  All running at once, deeply integrated.
+
+It would look something like this.  In real life the lines would be prettier,
+selected rows would be highlighted, etc., so use your imagination.  Also, the
+middle section would typically have many more rows, but let's just show a few
+for readability.
+
+────────────────────────────────────────────────────────────────────────────────────────
+1, name
+----------╠═1═╤══ NAME ══╣--------------------------------------------------------------
+documents ║ 1 │ project1 ║ src       => lib.rs       │ /* Lorem Ipsum Dolor
+projects => 2 │ project2 ║ test       │ mod1.rs     =>  * ...
+photos    ║ 3 │ project3=> README.md  │ mod2.rs      │  */
+          ║ 4 │ project4 ║ Cargo.toml │              │
+          ║   │          ║            │              │ use Foo::bar;
+──────────╨──────────────╨──────────────────────────────────────────────────────────────
+~/projects/project3> 
+────────────────────────────────────────────────────────────────────────────────────────
+
+The display is divided vertically into three sections:
+ 1. a single-line area at the top for options controlling the display of the middle section
+ 2. a yazi-like display of several directory levels, with a toggle-able preview area at right
+ 3. a command-line area at the bottom, where we will type and build commands to be executed
+
+Note that the yazi-like area scrolls both vertically (within the focussed level) and
+horizontally as you navigate within it.
+
+In this case, the top section specifies two columns for the focussed level:
+ - an index, starting at 1 (we could also have started at 0, or any integer)
+ - the file/directory name
+
+Here is a generic description of what is displayed:
+
+────────────────────────────────────────────────────────────────────────────────────────
+Display Options Area for focussed level
+----------╠═ LABELS ═╣------------------------------------------------------------------
+          ║          ║            │              │
+          ║ Focussed ║            │              │    Preview Area (when toggled on)
+          ║  Level   ║            │              │     (much taller in real life)
+          ║          ║            │              │
+          ║          ║            │              │
+──────────╨──────────╨──────────────────────────────────────────────────────────────────
+Command Line Area
+────────────────────────────────────────────────────────────────────────────────────────
+
+In addition to the Preview Area toggle, there is a toggle for Flat Mode.  In flat mode,
+the focussed column is always the last, and it shows all of the files under it at any depth
+up to the specified limit.  It looks like this:
+
+────────────────────────────────────────────────────────────────────────────────────────
+1, path
+---------------------╠═1═╤═══════ PATH ════════╣----------------------------------------
+documents │ project1 ║ 1 │ src/lib.rs          ║ /* Lorem Ipsum Dolor
+projects => project2 ║ 2 │ src/mod1.rs        =>  * ...
+photos    │ project3=> 3 │ src/mod2.rs         ║  */
+          │ project4 ║ 4 │ test/unit.rs        ║
+          │          ║ 5 │ Cargo.toml          ║ use Foo::bar;
+─────────────────────╨─────────────────────────╨────────────────────────────────────────
+~/projects/project3> 
+────────────────────────────────────────────────────────────────────────────────────────
+
+You navigate between these three vertical sections using Ctrl-Up and Ctrl-Down.
+
+When you are in the middle section, the ordinary characters you type will be used to fuzzy-find
+specific entries in the focussed column.  So if we just want to see Rust test files, we could type
+
+t .r
+
+and as we type each character, the list of entries in the focussed column would shrink.
+You could also specify a glob pattern in the top area, e.g.
+
+1, path test/*.rs
+
+Ctrl-Left and Ctrl-Right change the focussed column.  If you are in flat mode, that will change
+the number of columns, because the focussed column is always the last (rightmost).  So if in the
+above state we press Ctrl-Left, we end up with the following:
+
+────────────────────────────────────────────────────────────────────────────────────────
+, path
+----------╠═1═╤════════════ PATH ══════════════╣----------------------------------------
+documents ║ 1 │ project3/src/lib.rs            ║ /* Lorem Ipsum Dolor
+projects => 2 │ project3/src/mod1.rs          =>  * ...
+photos    ║ 3 │ project3/src/mod2.rs           ║  */
+          ║ 4 │ project3/test/unit.rs          ║
+          ║ 5 │ project3/Cargo.toml            ║ use Foo::bar;
+──────────╨────────────────────────────────────╨────────────────────────────────────────
+~/projects/project3> 
+────────────────────────────────────────────────────────────────────────────────────────
+
+The regular Up and Down keys change which row in the focussed level is selected and previewed.
+Ctrl-. will make that directory the current directory; this works even if you have a command
+partially typed in the command area.  Ctrl-@ adds a file or directory to a list that the command
+can access, e.g.
+
+mv @ foo
+
+Many powerful features can be invoked in the top section.  For example, you could change it to
+
+ext, path
+
+and now the entries would be sorted first by extension, then by path.  Ordinarily sorts ascend
+downward, but a caret suffix will make it ascend upward.  If we change it to
+
+size^ > 1k, path
+
+Now we are sorting by size, ascending upward, and then by path.  We are also filtering the entries
+to show only those files with a size > 1 kb.  This gets us the following display:
+
+────────────────────────────────────────────────────────────────────────────────────────
+size^ > 1k, path
+----------╠═ SIZE ═╤════════════ PATH ══════════════╣-----------------------------------
+documents ║ 1609 b │ project4/src/lib.rs            ║ /* Lorem Ipsum Dolor
+projects => 1434 b │ project3/src/mod1.rs          =>  * ...
+photos    ║ 1190 b │ project2/src/lib.rs            ║  */
+          ║ 1190 b │ project3/test/unit.rs          ║
+          ║        │                                ║ use Foo::bar;
+──────────╨─────────────────────────────────────────╨───────────────────────────────────
+~/projects/project3> 
+────────────────────────────────────────────────────────────────────────────────────────
+
+But this is not just about files.  If you were to change the specification at the top to
+
+1, cpu^ > 1
+
+the tool would know that cpu is an attribute of processes, not files, and show you this:
+
+────────────────────────────────────────────────────────────────────────────────────────────────
+1, cpu^ > 1
+----------╠═1═╤═ CPU ═╤═ PID ═╤═════════════ NAME ══════════════╣-------------------------------
+1=>    79 ║ 1 │ 26.06 │ 83794 │ Preview                         ║
+  │   449 ║ 2 │ 12.25 │ 72759 │ mdworker_shared                 ║
+  │  1794 ║ 3 │ 11.57 │ 31897 │ iTerm2                          ║
+  │  2849=> 4 │  5.10 │ 59893 │ nu                              ║
+  │ 83794 ║ 5 │  1.85 │ 15935 │ Google Chrome Helper (Renderer) ║
+  │ 83798 ║ 6 │  1.40 │ 88852 │ Google Chrome Helper (Renderer) ║
+──────────╨─────────────────────────────────────────────────────╨───────────────────────────────
+~/projects/project3> 
+────────────────────────────────────────────────────────────────────────────────────────────────
+
+The focussed level is showing us the children of process 2849, in order by CPU usage.
+
+Note that we can use the row numbers in commands, e.g.
+
+kill #4-6
+
+Processes form trees too, so flat mode works here as well, showing "ppath" as pid/pid/....
+
+By the way, if you were to start a command with "kill ", the tool would know that you
+were talking about processes and put "1, pid" (or "1, ppath" in flat mode) in the spec area
+automatically.
+
+== BUT HOW? ==
+
+So now that we have seen a few examples of how it would be used, let's talk about what's
+going on to achieve this.  First, instead of invoking a command to produce some data and
+then piping that through other commands such as "where" and "sort-by" to pick and order
+the fields, we flip the script, just saying what we want and letting the shell figure out
+how to produce it.  Notice that we never have to use -l to get additional fields, because
+the shell tells the command what columns it needs.  The command produces all of those and
+no more, for maximum efficiency.
+
+Commands are interrogated by the shell for the columns they can produce, and the
+"importance" of each column.  The shell searches through this catalog and uses the first
+command it finds that can produce the desired columns.  It shows additional columns as
+space permits, in order of importance.
+
+Starting from what we want to see results in less typing because so much can be inferred.
+With a single mention of key columns we can specify what we want included in the output,
+the sort order, and constraints.
