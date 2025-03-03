@@ -127,30 +127,36 @@ But this is not just about files.  If you were to change the specification at th
 
 the tool would know that cpu is an attribute of processes, not files, and show you this:
 
-────────────────────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────────────
 1, cpu^ > 1
-----------╠═1═╤═ CPU ═╤═ PID ═╤═════════════ NAME ══════════════╣-------------------------------
+----------╠═1═╤═ CPU ═╤═ PID ═╤═════════════ NAME ══════════════╣-----------------------
 1=>    79 ║ 1 │ 26.06 │ 83794 │ Preview                         ║
   │   449 ║ 2 │ 12.25 │ 72759 │ mdworker_shared                 ║
   │  1794 ║ 3 │ 11.57 │ 31897 │ iTerm2                          ║
   │  2849=> 4 │  5.10 │ 59893 │ nu                              ║
   │ 83794 ║ 5 │  1.85 │ 15935 │ Google Chrome Helper (Renderer) ║
   │ 83798 ║ 6 │  1.40 │ 88852 │ Google Chrome Helper (Renderer) ║
-──────────╨─────────────────────────────────────────────────────╨───────────────────────────────
+──────────╨─────────────────────────────────────────────────────╨───────────────────────
 ~/projects/project3> 
-────────────────────────────────────────────────────────────────────────────────────────────────
+────────────────────────────────────────────────────────────────────────────────────────
 
 The focussed level is showing us the children of process 2849, in order by CPU usage.
 
 Note that we can use the row numbers in commands, e.g.
 
-kill #4-6
+kill #4-9,12
+
+The corresponding pids are substituted.
 
 Processes form trees too, so flat mode works here as well, showing "ppath" as pid/pid/....
 
 By the way, if you were to start a command with "kill ", the tool would know that you
 were talking about processes and put "1, pid" (or "1, ppath" in flat mode) in the spec area
 automatically.
+
+So far we have been thinking of the bottom area as a single shell, but Ctrl-Left/Right
+in the bottom section scroll horizontally through multiple shells.  As you do things in
+the yazi-like area, like changing the current directory, they affect the selected shell.
 
 == BUT HOW? ==
 

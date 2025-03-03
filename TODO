@@ -11,3 +11,4 @@ Hashed
 CompressedSignal
 SumMults
 TopN: slice version (more efficent) and iterator version (stores values in power-of-2 ring)
+Power-of-2 optimization for https://github.com/andreacorbellini/rust-circular-buffer ?

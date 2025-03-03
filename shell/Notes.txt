@@ -1,0 +1,320 @@
+When Nushell first came out, I was excited.  I had been thinking about working on a new
+shell that passed structured data along pipelines, and here was a shell that had much of
+what I was thinking about, and a lot more.  Cool!  And the project seems to be making good
+progress.
+
+But there was one aspect of what I was contemplating that Nushell didn't address.
+This document talks about that, about a different way for queries to work.
+
+Consider the nu command
+
+$ ls -l | where size > 10m && group == staff | sort-by size
+
+We issue a command that produces some columns, pipe the results through a filter command,
+then through a sort command, and (implicitly) through one that renders the results as a table.
+But what if we simply described the table we want and let the shell figure out how to
+produce it, e.g.
+
+$ size > 10m, group staff
+╭───┬──────┬─────────┬───────┬─────╮
+│ # │ SIZE │   FILE  │  GIST │ MOD │
+├───┼──────┼─────────┼───────┼─────┤
+│ 0 │  25m │ bar.mp4 │  .Rw- │  3M │
+├───┼──────┼─────────┼───────┼─────┤
+│ 1 │  36m │ foo.mp4 │ @.RWX │  8m │
+╰───┴──────┴─────────┴───────┴─────╯
+
+OK, how did our request result in that table?  Well, all it took was a few simple rules
+applied to some metadata about commands.  The user could specify a list of commands to be
+tried, in order, to see whether they produce the columns named in the query.  So the shell
+would walk down that list until it finds "ls" -- it produces a file and a size.  Each
+command provides the shell with metadata about its arguments: name, type, etc.
+
+Here are the main rules:
+ 1. Fields mentioned in the query are included in the output after the # column,
+    in order of mention, except where it wouldn't add any information:
+      a. Fields which are constrained to a single value are not shown.
+      b. Fields which duplicate information in another column are not shown.
+ 2. Rows are ordered by the first column (after the #), then by the second column, etc.
+
+
+There are two files, last modified 3 months and 8 minutes ago.
+Both are plain files (the . in gist).  Both are world-readable (R instead of r),
+and foo.mp4 is world-writable and -executable.  Also, its owner is not the owner
+of the containing directory (the @).
+
+There is a size column in the output, and the rows are sorted by size, just because
+we mentioned size in the query.  Reports are always sorted by columns from left to right.
+Ordinarily sorts ascend downwards, but if we want them to ascend upwards we can just add
+a caret after the column name:
+
+$ size^ > 10m
+╭───┬──────┬─────────┬───────┬─────╮
+│ # │ SIZE │   FILE  │  GIST │ MOD │
+├───┼──────┼─────────┼───────┼─────┤
+│ 0 │  36m │ foo.mp4 │ @.RWX │  8m │
+├───┼──────┼─────────┼───────┼─────┤
+│ 1 │  25m │ bar.mp4 │  .Rw- │  3M │
+╰───┴──────┴─────────┴───────┴─────╯
+
+If we had mentioned more than one column, they would all potentially affect
+the sort, although in the following case the values in the FILE column are
+unique, so that column alone fully determines the order:
+
+$ file, size > 10m, owner
+╭───┬─────────┬──────┬───────┬───────╮
+│ # │   FILE  │ SIZE │ OWNER │  GIST │
+├───┼─────────┼──────┼───────┼───────┤
+│ 0 │ bar.mp4 │  25m │       │  .Rw- │
+├───┼─────────┼──────┼───────┼───────┤
+│ 1 │ foo.mp4 │  36m │ maryk │ @.RWx │
+╰───┴─────────┴──────┴───────┴───────╯
+
+Now the list is sorted by filename, and we can see the owners.
+If the owner is me, it is not shown, so that the others stand out.
+But why did the MOD column disappear?  The table formatter automatically
+shows more columns in wider terminals, so let me make the terminal
+(which is apparently not very wide here!) a little wider.
+
+$ file, size > 10m, owner
+╭───┬─────────┬──────┬───────┬───────┬─────╮
+│ # │   FILE  │ SIZE │ OWNER │  GIST │ MOD │
+├───┼─────────┼──────┼───────┼───────┼─────┤
+│ 0 │ bar.mp4 │  25m │       │  .Rw- │  3M │
+├───┼─────────┼──────┼───────┼───────┼─────┤
+│ 1 │ foo.mp4 │  36m │ maryk │ @.RWx │  8m │
+╰───┴─────────┴──────┴───────┴───────┴─────╯
+
+The MOD column has returned.  If I made it wider still, we would see
+additional columns, like PERM and NUM.
+
+I could also ask it to show just the files owned by someone other
+than the containing directory's owner.
+
+$ file, size > 10m, owner.notdir
+╭───┬─────────┬──────┬───────┬───────┬─────╮
+│ # │   FILE  │ SIZE │ OWNER │  GIST │ MOD │
+├───┼─────────┼──────┼───────┼───────┼─────┤
+│ 0 │ bar.mp4 │  36m │ maryk │ @.RWx │  8m │
+╰───┴─────────┴──────┴───────┴───────┴─────╯
+
+But perhaps I want to look not just in the current directory, but also in all of its
+children, recursively.  Let's look for all the files under . with extension rs.
+
+$ size, path, x rs
+╭───┬───────┬──────────────────────┬─────╮
+│ # │ SIZE  │        PATH          │ MOD │
+├───┼───────┼──────────────────────┼─────┤
+│ 0 │  844b │ my_crate/test/foo.rs │ 13w │
+├───┼───────┼──────────────────────┼─────┤
+│ 1 │ 1365b │ my_crate/src/main.rs │  1M │
+╰───┴───────┴──────────────────────┴─────╯
+
+Prior to this request, the shell had been implicitly using the ls command, since that
+was the first one it found (in some list of data sources) that had the required fields.
+But now we asked for a "path"; the "ls **" command is the first one that produces a path.
+Note that the extension does not appear as a separate column; it's already shown in the path.
+
+The actual name for the extension column in ext, but we have created an x alias for it.
+Let's do the same for file and path.
+
+col path alias p
+col file alias f
+
+Indeed, we might not be asking about files at all, but perhaps processes:
+
+$ ppid, cpu/sum > 1
+╭───┬───────┬───────┬───────┬─────────────────────────────────╮
+│ # │  PPID │  CPU  │  PID  │              NAME               │
+├───┼───────┼───────┼───────┼─────────────────────────────────┤
+│ 0 │     1 │  6.06 │ 83794 │ Google Chrome                   │
+│ 1 │     1 │ 12.25 │ 72759 │ mdworker_shared                 │
+│ 2 │     1 │ 21.57 │   897 │ iTerm2                          │
+│   │ ┄┄┄┄┄┄┼┄┄┄┄┄┄ │       │                                 │
+│   │     1 │ 39.88 │       │                                 │
+│   ┝━━━━━━━┿━━━━━━━┥       │                                 │
+│ 3 │ 59849 │  5.10 │ 59893 │ nu                              │
+│   │ ┄┄┄┄┄┄┼┄┄┄┄┄┄ │       │                                 │
+│   │ 59849 │  5.10 │       │                                 │
+│   ┝━━━━━━━┿━━━━━━━┥       │                                 │
+│ 4 │ 83794 │  1.25 │ 15935 │ Google Chrome Helper (Renderer) │
+│ 5 │ 83794 │  1.40 │ 88852 │ Google Chrome Helper (Renderer) │
+│ 6 │ 83794 │  1.71 │ 83922 │ Google Chrome Helper (Renderer) │
+│ 7 │ 83794 │  2.64 │ 83811 │ Google Chrome Helper            │
+│ 8 │ 83794 │  4.78 │ 83920 │ Google Chrome Helper (Renderer) │
+│ 9 │ 83794 │  6.05 │ 83810 │ Google Chrome Helper (GPU)      │
+│   │ ┄┄┄┄┄┄┼┄┄┄┄┄┄ │       │                                 │
+│   │ 83794 │ 17.83 │       │                                 │
+│   ┝━━━━━━━┿━━━━━━━┥       │                                 │
+│   │       │ 62.81 │       │                                 │
+╰───┴───────┴───────┴───────┴─────────────────────────────────╯
+
+Here we asked to see processes with cpu > 1, sorted first by ppid and then by cpu,
+with totals generated for the cpu values on sort breaks.  Perhaps the total lines
+should be colored or styled differently for emphasis.  One could imagine other
+aggregators as well, such as "avg" or "count".
+
+The expressions can get fairly sophisticated.  Here is a query for files under
+the current directory that contain lines with more than 80 characters.
+
+$ path, ext rs, lines.any(len > 80)
+
+
+---------------
+
+
+$ . size > 10m
+$ . .size > 10m
+╭───┬────────────┬──────┬───────┬──────────────╮
+│ # │    file    │ type │ size  │   modified   │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 0 │ bar.mp4    │ file │  25 M │ 4 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 1 │ bar.mp4    │ file │  36 M │ 6 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 2 │ baz/01.mp4 │ file │ 136 M │ 4 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 2 │ baz/01.mp4 │ file │ 136 M │ 2 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 2 │ baz/01.mp4 │ file │ 136 M │ 4 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 2 │ baz/01.mp4 │ file │ 136 M │ 4 months ago │
+╰───┴────────────┴──────┴───────┴──────────────╯
+
+$ dir, name *.mp4, -size > 10m
+$ .dir, .name *.mp4, .-size > 10m
+
+$ .type link
+
+
+$ size > 10m, owner, perm
+
+$ size > 10m,
+
+$ ,size>10m,
+
+1. You figure out the command.
+2. Include all of its standard columns.
+3. Include a size column, placed leftmost after the row number.
+
+$ .size > 10m | mv big
+
+1. You figure out the command.
+How would it know whether to search * or **.  Sure, whichever is first,
+but both are equally reasonable.
+
+$ . .size > 10m
+$ * .size > 10m
+
+
+
+Here is a command I might issue (I'll use the $ symbol to denote a prompt here):
+
+ $ file
+╭───┬────────────┬──────┬───────┬──────────────╮
+│ # │    file    │ type │ size  │   modified   │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 0 │ bar        │ file │  65 B │ 4 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 1 │ foo        │ file │ 936 B │ 4 months ago │
+├───┼────────────┼──────┼───────┼──────────────┤
+│ 2 │ token-iter │ dir  │ 736 B │ 4 months ago │
+╰───┴────────────┴──────┴───────┴──────────────╯
+
+I got a few columns about files in the current directory,
+sorted by file (filename).
+
+Wait, what?  How did it know that I wanted a list of files?
+How did it know I wanted those fields?
+How did it know that I wanted it sorted by filename?
+
+To sort by size instead of filename:
+
+ $ size
+╭───┬───────┬────────────┬──────┬──────────────╮
+│ # │ size  │    file    │ type │   modified   │
+├───┼───────┼────────────┼──────┼──────────────┤
+│ 0 │ 565 B │ bar        │ file │ 4 months ago │
+├───┼───────┼────────────┼──────┼──────────────┤
+│ 1 │ 736 B │ token-iter │ dir  │ 4 months ago │
+├───┼───────┼────────────┼──────┼──────────────┤
+│ 2 │ 936 B │ foo        │ file │ 4 months ago │
+╰───┴───────┴────────────┴──────┴──────────────╯
+
+Notice that the size column is now first, to show that we are sorting on it.
+
+Perhaps I only want the rows of type file:
+
+ $ size, type file
+╭───┬───────┬────────────┬──────────────╮
+│ # │ size  │    file    │   modified   │
+├───┼───────┼────────────┼──────────────┤
+│ 0 │ 565 B │ bar        │ 4 months ago │
+├───┼───────┼────────────┼──────────────┤
+│ 1 │ 936 B │ foo        │ 4 months ago │
+╰───┴───────┴────────────┴──────────────╯
+
+Notice that type is no longer displayed, because we constrained it
+to a single possible value.  No point showing it!
+
+But perhaps I want to look not just in the current directory, but also in all of its
+children, recursively:
+
+$ size, path, file *.rs
+╭───┬───────┬────────────────────────┬──────────────╮
+│ # │ size  │          path          │   modified   │
+├───┼───────┼────────────────────────┼──────────────┤
+│ 0 │ 844 B │ token-iter/test/foo.rs │ 3 months ago │
+├───┼───────┼────────────────────────┼──────────────┤
+│ 1 │ 965 B │ token-iter/src/main.rs │ 4 months ago │
+╰───┴───────┴────────────────────────┴──────────────╯
+
+Prior to this request, the shell had been implicitly using the ls command, since that
+was the first one it found (in some list of data sources) that had the required fields.
+But now we asked for a "path"; the "ls **" command is the first one that produces a path.
+Note that the file does not appear as a separate column; it's already part of the path.
+
+Indeed, we might not be asking about files at all, but perhaps processes:
+
+$ ppid, cpu/sum > 1
+╭────┬───────┬───────┬───────┬─────────────────────────────────╮
+│  # │ ppid  │  cpu  │  pid  │              name               │
+├────┼───────┼───────┼───────┼─────────────────────────────────┤
+│  0 │     1 │  6.06 │ 83794 │ Google Chrome                   │
+│  1 │     1 │ 12.25 │ 72759 │ mdworker_shared                 │
+│  2 │     1 │ 21.57 │   897 │ iTerm2                          │
+│    │_____1_│_39.88_│       │                                 │
+│  3 │ 59849 │  5.10 │ 59893 │ nu                              │
+│    │_59849_│__5.10_│       │                                 │
+│  4 │ 83794 │  1.25 │ 15935 │ Google Chrome Helper (Renderer) │
+│  5 │ 83794 │  1.40 │ 88852 │ Google Chrome Helper (Renderer) │
+│  6 │ 83794 │  1.71 │ 83922 │ Google Chrome Helper (Renderer) │
+│  7 │ 83794 │  2.64 │ 83811 │ Google Chrome Helper            │
+│  8 │ 83794 │  4.78 │ 83920 │ Google Chrome Helper (Renderer) │
+│  9 │ 83794 │  6.05 │ 83810 │ Google Chrome Helper (GPU)      │
+│    │_83794_│_17.83_│       │                                 │
+│    │       │_62.81_│       │                                 │
+╰────┴───────┴───────┴───────┴─────────────────────────────────╯
+
+Here we asked to see processes with cpu > 1, sorted first by ppid and then by cpu,
+with totals generated for the cpu values on sort breaks.  Perhaps the total lines
+should be colored or styled differently for emphasis.  One could imagine other
+aggregators as well, such as "avg" or "count".
+
+So now that we have seen a few examples of how it would be used, let's talk about what's
+going on to achieve this.  First, instead of invoking a command to produce some data and
+then piping that through other commands such as "where" and "sort-by" to pick and order
+the fields, we reverse the script by saying what we want and letting the shell figure out
+how to produce it.  Notice that we never have to use -l to get additional fields, because
+the shell tells the command what columns it needs.  The command produces all of those and
+no more, for maximum efficiency.
+
+There is a simple catalog somewhere listing commands, the columns they *can* produce,
+implicitly requested columns (notice that we always got a "modified" column), etc.
+The shell searches through this catalog and uses the first command it finds that
+can produce the desired columns.
+
+Starting from what we want to see results in less typing because so much can be inferred.
+With a single mention of key columns we can specify what we want included in the output,
+the sort order, and constraints.
+
