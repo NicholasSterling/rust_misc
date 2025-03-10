@@ -11,9 +11,17 @@ fn main() {
     }
     dbg!(::std::env::args().collect::<Vec<_>>());
 
-    // Initialize an array using a function.
-    let squares: [i32; 20] = (1..20).map(|i| i*i).collect();
-    dbg!(squares);
+    // Initialize a const array using a function.
+    /*
+    use core::range::Range;
+    const xs: Range<i32> = 1i32..11;
+    const SQUARES: [i32; 10] =
+        // xs.map(|i| i*i);
+        // std::array::from_fn(|i| (i+1)*(i+1));
+        // std::array::from_iter(|i| (i+1)*(i+1));
+        // xs.map(|x| x*x).collect::<Vec<_>>().try_into().unwrap();
+    dbg!(SQUARES);
+    */
 
     // A bit of filtering.
     let v1 = vec![1,2,3];
@@ -26,8 +34,8 @@ fn main() {
     // fn r() -> Range<u32> { 0..15 }
     let r = { || 0..15 };
     dbg!(r());
-    fn is_even1(x:  u32) -> bool {  x % 2 == 0 }
-    fn is_even2(x: &u32) -> bool { *x % 2 == 0 }
+    fn is_even1(x:  u32) -> bool {  x % 2 == 0 }  // x is copied
+    fn is_even2(x: &u32) -> bool { *x % 2 == 0 }  // x is borrowed
     let is_even3 = | x: &u32| *x % 2 == 0;
     let is_even4 = |&x: &u32|  x % 2 == 0;
     // println!("{:?}", r().filter(is_even1 ).collect::<Vec<u32>>());
@@ -177,36 +185,8 @@ fn main() {
     // Balanced pairs.
     // Here's a clever solution: https://exercism.org/tracks/rust/exercises/matching-brackets/solutions/michaelmez39
     // My solution: https://exercism.org/tracks/rust/exercises/matching-brackets/solutions/NicholasSterling
-    fn is_balanced(string: &str) -> bool {
-        let mut need = Vec::<char>::new();
-        for c in string.chars() {
-            match c {
-
-                // If it's an opener, push the corresponding closer.
-                '{' => need.push('}'),
-                '[' => need.push(']'),
-                '(' => need.push(')'),
-
-                // If it's a closer, it should be what we are expecting.
-                c @ ( '}' | ']' | ')' ) =>
-                    if need.pop() != Some(c) {
-                        return false;
-                    },
-
-                _ => ()
-            }
-        }
-        need.is_empty()
-    }
-    dbg!(is_balanced(""));
-    dbg!(is_balanced("{}"));
-    dbg!(is_balanced("{}{}"));
-    dbg!(is_balanced("{[]}"));
-    dbg!(is_balanced("{[]{}}<>"));
-    dbg!(is_balanced("}{}"));
-    dbg!(is_balanced("{}}{}"));
-
-    fn is_balanced(string: &str, pairs: &[(char, char)]) -> bool {
+  
+    fn my_is_balanced(string: &str, pairs: &[(char, char)]) -> bool {
         let mut need = Vec::new();
         for c in string.chars() {
             if let Some((_, close)) = pairs.iter().find( |(open, _)| c == *open ) {
@@ -218,6 +198,17 @@ fn main() {
         need.is_empty()
     }
     const PAIRS: [(char,char); 3] = [ ('(',')'), ('[',']'), ('{','}') ];
+    fn is_balanced(string: &str) -> bool {
+        my_is_balanced(string, &PAIRS)
+    }
+
+    dbg!(is_balanced(""));
+    dbg!(is_balanced("{}"));
+    dbg!(is_balanced("{}{}"));
+    dbg!(is_balanced("{[]}"));
+    dbg!(is_balanced("{[]{}}<>"));
+    dbg!(is_balanced("}{}"));
+    dbg!(is_balanced("{}}{}"));
 
 }
 
