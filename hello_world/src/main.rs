@@ -202,13 +202,13 @@ fn main() {
         my_is_balanced(string, &PAIRS)
     }
 
-    dbg!(is_balanced(""));
-    dbg!(is_balanced("{}"));
-    dbg!(is_balanced("{}{}"));
-    dbg!(is_balanced("{[]}"));
-    dbg!(is_balanced("{[]{}}<>"));
-    dbg!(is_balanced("}{}"));
-    dbg!(is_balanced("{}}{}"));
+    assert!( is_balanced(""));
+    assert!( is_balanced("{}"));
+    assert!( is_balanced("{}{}"));
+    assert!( is_balanced("{[]}"));
+    assert!( is_balanced("{[]{}}<>"));
+    assert!(!is_balanced("}{}"));
+    assert!(!is_balanced("{}}{}"));
 
 }
 

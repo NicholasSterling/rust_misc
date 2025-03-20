@@ -99,7 +99,16 @@ mod tests {
 
     proptest! {
         #[test]
-        fn test_result_matches(limit in 1..100_000u64, factors in proptest::collection::vec(1..50u64, 1..10)) {
+        fn test_result_matches1(limit in 1..10_000u64, factors in proptest::collection::vec(1..50u64, 1..10)) {
+            let ours = sum_multiples(limit, &factors[..]);
+            let good = slow_reliable(limit, &factors[..]);
+            prop_assert_eq!(ours, good);
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn test_result_matches2(limit in 1000..100_000u64, factors in proptest::collection::vec(1..80u64, 5..15)) {
             let ours = sum_multiples(limit, &factors[..]);
             let good = slow_reliable(limit, &factors[..]);
             prop_assert_eq!(ours, good);
