@@ -191,7 +191,7 @@ fn main() {
         for c in string.chars() {
             if let Some((_, close)) = pairs.iter().find( |(open, _)| c == *open ) {
                 need.push(*close);
-            } else if PAIRS.iter().any( |(_, close)| c == *close ) && need.pop() != Some(c) {
+            } else if pairs.iter().any( |(_, close)| c == *close ) && need.pop() != Some(c) {
                 return false;
             }
         }
