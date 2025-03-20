@@ -144,7 +144,7 @@ fn main() {
     let m: HashMap<_, _> = tuples.iter().map(|(k,v)| (k, v.to_string())).collect();
     println!("{:?}", m);
 
-    make_people();
+    make_names();
 
 /////////////////////////////////////////////
 
@@ -177,8 +177,8 @@ fn main() {
     fn div_rounded<T: Integer + Div + From<usize> + Copy>(numer: T, denom: T) -> T {
         (numer + denom/2.into()) / denom
     }
-    dbg!(div_rounded(7,3));  // 2
-    dbg!(div_rounded(8,3));  // 3
+    assert_eq!(div_rounded(7,3), 2);
+    assert_eq!(div_rounded(8,3), 3);
 
 /////////////////////////////////////////////
 
@@ -186,7 +186,7 @@ fn main() {
     // Here's a clever solution: https://exercism.org/tracks/rust/exercises/matching-brackets/solutions/michaelmez39
     // My solution: https://exercism.org/tracks/rust/exercises/matching-brackets/solutions/NicholasSterling
   
-    fn my_is_balanced(string: &str, pairs: &[(char, char)]) -> bool {
+    fn my_is_balanced(pairs: &[(char, char)], string: &str) -> bool {
         let mut need = Vec::new();
         for c in string.chars() {
             if let Some((_, close)) = pairs.iter().find( |(open, _)| c == *open ) {
@@ -198,9 +198,7 @@ fn main() {
         need.is_empty()
     }
     const PAIRS: [(char,char); 3] = [ ('(',')'), ('[',']'), ('{','}') ];
-    fn is_balanced(string: &str) -> bool {
-        my_is_balanced(string, &PAIRS)
-    }
+    let is_balanced = |str| my_is_balanced(&PAIRS, str);
 
     assert!( is_balanced(""));
     assert!( is_balanced("{}"));
@@ -231,32 +229,32 @@ where I: IntoIterator<Item = V>,
 // collect_tuple
 
 #[derive(Debug)]
-struct Person<'a> {
+struct Name<'a> {
     first: &'a str,
     last:  &'a str,
 }
 
-impl<'a> Person<'a> {
-    // Create a Person from a str of form "last,first".
+impl<'a> Name<'a> {
+    // Create a Name from a str of form "last,first".
     fn from_csv(s: &'a str) -> Option<Self> {
-        s.split(',').collect_tuple().map(
-            |(last, first)| Person { first, last }
+        s.split(',').collect_tuple().map( //      <======
+            |(last, first)| Name { first, last }
         )
     }
 }
 
-fn make_people() {
-    dbg!(Person::from_csv("Doe"));          // None
-    dbg!(Person::from_csv("Doe,John"));     // Some(...)
-    dbg!(Person::from_csv("Doe,John,foo")); // None
-    let p1 = Person::from_csv("Doe,Jane").unwrap();
+fn make_names() {
+    dbg!(Name::from_csv("Doe"));          // None
+    dbg!(Name::from_csv("Doe,John"));     // Some(...)
+    dbg!(Name::from_csv("Doe,John,foo")); // None
+    let p1 = Name::from_csv("Doe,Jane").unwrap();
     dbg!(p1.first);
     dbg!(p1.last);
 }
 
 /////////////////////////////////////////////
 
-// Make array on the heap without first making it on the stack.
+// Make array on the heap without first making it on the stack?
 // https://users.rust-lang.org/t/u8-1024-1024-or-a-vec-u8/106542/16
 pub fn make_boxed_array<T, const N: usize, F: Fn(usize) -> T>(f: F) -> Box<[T; N]> {
     (0..N).map(f).collect::<Box<[_]>>().try_into().ok().unwrap()
